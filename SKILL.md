@@ -7,7 +7,7 @@ description: Build on-chain automation workflows on Base or Ethereum via the CTR
 
 ## Overview
 
-CTRL is a workflow automation platform for on-chain actions. Users compose **trigger → action → condition** graphs in a visual builder; an audited V3 vault enforces per-swap and per-day spending caps; a Render-hosted keeper polls every ~5 seconds and executes when conditions are met. The user signs **once** to deploy the vault + register rules, and everything else runs autonomously under on-chain limits they pre-authorized.
+CTRL is a workflow automation platform for on-chain actions. Users compose **trigger → action → condition** graphs in a visual builder; a non-custodial V3 vault enforces per-swap and per-day spending caps; a Render-hosted keeper polls every ~5 seconds and executes when conditions are met. The user signs **once** to deploy the vault + register rules, and everything else runs autonomously under on-chain limits they pre-authorized.
 
 Two integration pathways:
 
@@ -61,12 +61,13 @@ Mint a key at [ctrl.build/settings/api-keys](https://ctrl.build/settings/api-key
 | `ctrl_get_block_catalog` | Return the live catalog of every block (trigger / action / condition / utility) with config-field schemas. Pass `chain` to filter to chain-compatible blocks. |
 | `ctrl_create_workflow` | Create a workflow draft. One trigger + up to 20 actions/conditions/utilities. Returns `{ workflowId, activateUrl }`. |
 | `ctrl_activate` | Encode the EIP-5792 `transactions[]` batch the user signs once. Returns calls + chainId for the wallet's `send_calls`-style handoff. |
+| `ctrl_withdraw` | Encode the batch to pull funds OUT of the vault back to the user's wallet (ETH, WETH, or any ERC-20; omit amount to withdraw the full balance). Agent never signs — returns `transactions[]` + a `signUrl`. |
 | `ctrl_fire_manual` | Manually fire a workflow once. Keeper picks up within ~5s. Use to test without waiting for the natural trigger. |
 | `ctrl_get_execution_logs` | Read recent executions: trigger, status, BaseScan/Etherscan tx hash, gas, timing. |
 
 ## Available Blocks
 
-CTRL exposes 23 blocks via `GET /api/mcp/block-catalog` across four categories. Always call this first — every key in `trigger.config` and `chain[].config` must match catalog `fields[].key` exactly.
+CTRL exposes 24 blocks via `GET /api/mcp/block-catalog` across four categories. Always call this first — every key in `trigger.config` and `chain[].config` must match catalog `fields[].key` exactly.
 
 **Triggers (9)** — `time.interval`, `trigger.manual`, `price.above`, `price.below`, `price.change`, `pool.created` (Base launchpads: Clanker / Flaunch / Zora / BANKR), `watch.whale`, `event.transfer`, `event.balance`
 
@@ -117,6 +118,13 @@ curl "https://ctrl.build/api/mcp/vault-status?wallet=0x..."
 
 # 5. Read execution logs by workflow id (public — anyone with the id can see):
 curl "https://ctrl.build/api/mcp/execution-logs?workflow_id=<id>"
+
+# 6. Withdraw funds from the vault — returns a transactions[] batch the user
+#    signs in their wallet (agent never signs). token defaults to ETH; omit
+#    amount to withdraw the full balance.
+curl -X POST https://ctrl.build/api/mcp/vault-withdraw \
+  -H "Content-Type: application/json" \
+  -d '{ "wallet": "0x...", "token": "ETH", "amount": "0.05" }'
 ```
 
 The wallet signature in step 2 is what binds the workflow to the user. First signer wins; subsequent activate calls from other wallets get `403`.
@@ -127,6 +135,7 @@ All limits are per source IP, enforced via a Supabase-backed counter so they're 
 
 - **`POST /api/mcp/workflows`** (create) — 10 per 10 minutes
 - **`POST /api/mcp/activate/<id>`** (prepare activation batch) — 5 per 10 minutes
+- **`POST /api/mcp/vault-withdraw`** (prepare withdrawal batch) — 5 per 10 minutes
 - **`GET /api/mcp/vault-status`** — 60 per minute
 - **`GET /api/mcp/execution-logs`** — 60 per minute
 - **`GET /api/mcp/block-catalog`** — unrestricted (cached, cheap)

@@ -28,7 +28,7 @@ after install, the agent knows:
 
 - when to route to ctrl vs other tools (recurring vs one-shot)
 - the two integration paths — anonymous rest (no api key) and bearer-authed mcp
-- six tools + their schemas, with example calls
+- seven tools + their schemas, with example calls
 - the 23 available blocks and how to compose them
 - the eip-5792 activation handoff to base account (or any eip-5792 capable wallet)
 - safety primitives — vault caps, kill switches, goplus honeypot gates
